@@ -35,7 +35,7 @@ namespace CodeStyleEnforcer
 		public DiagnosticDescriptor Descriptor { get; private set; }
 
 		public DiagnosticAttribute(params SyntaxKind[] syntaxKinds) : this(kinds: syntaxKinds) { }
-		public DiagnosticAttribute(string title = null, bool isEnabledByDefault = true, string description = null, string helpLinkUri = null, string messageFormat = null, Categories category = Categories.Style, DiagnosticSeverity defaultSeverity = DiagnosticSeverity.Warning, string[] customTags = null, params SyntaxKind[] kinds)
+		public DiagnosticAttribute(string title = null, bool isEnabledByDefault = true, string description = null, string helpLinkUri = null, string messageFormat = null, Categories category = Categories.Style, DiagnosticSeverity defaultSeverity = CodeStyleEnforcerAnalyzer.DefaultSeverity, string[] customTags = null, params SyntaxKind[] kinds)
 		{
 			SyntaxKinds = kinds;
 			Title = title;

@@ -19,12 +19,11 @@ namespace CodeStyleEnforcer
 	[DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class CodeStyleEnforcerAnalyzer : DiagnosticAnalyzer
     {
+		public const DiagnosticSeverity DefaultSeverity = DiagnosticSeverity.Error;
 	    private const string SupportedNamespace = "VusrCore";
 	    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => _supportedDiagnostics;
 		public override void Initialize(AnalysisContext context)
         {
-
-
 	        context.RegisterSyntaxNodeAction(FileMustEndInNewLine, SyntaxKind.CompilationUnit);
 	        context.RegisterSyntaxNodeAction(ClosingBraceMustHaveComment, SyntaxKind.NamespaceDeclaration, SyntaxKind.ClassDeclaration, SyntaxKind.InterfaceDeclaration);
 	        context.RegisterSyntaxNodeAction(MembersMustBePrecededByEmptyLine, SyntaxKind.InterfaceDeclaration, SyntaxKind.ClassDeclaration, SyntaxKind.NamespaceDeclaration);
@@ -32,31 +31,31 @@ namespace CodeStyleEnforcer
 		}
 
 		///Todo: register only on namespace
-	    public static void CheckSupport(CompilationStartAnalysisContext obj)
+	    public static bool CheckSupport(SyntaxNode node)
 	    {
 		    bool foundSupportedNameSpace = false;
-		    foreach (var tree in obj.Compilation.SyntaxTrees)
-		    {
-			    SyntaxNode root;
-			    if(!tree.TryGetRoot(out root)) continue;
-				var nsDeclarations = root.DescendantNodes().OfType<NamespaceDeclarationSyntax>();
-			    foreach (var nsd in nsDeclarations)
-			    {
-				    foundSupportedNameSpace = nsd.Name.ToFullString().ToLowerInvariant().Contains(SupportedNamespace.ToLowerInvariant());
-					if(foundSupportedNameSpace) break;
-			    }
+			var nsDeclarations = node.AncestorsAndSelf().OfType<NamespaceDeclarationSyntax>();
+			foreach (var nsd in nsDeclarations)
+			{
+				foundSupportedNameSpace = nsd.Name.ToFullString().ToLowerInvariant().Contains(SupportedNamespace.ToLowerInvariant());
 				if(foundSupportedNameSpace) break;
 			}
-			if(!foundSupportedNameSpace) return;
-		}
+		    return foundSupportedNameSpace;
+	    }
 
 	    [Diagnostic]
 	    public static void EnumsMustEndInS(SymbolAnalysisContext obj)
 	    {
-			if(!obj.Symbol.IsDefinition)return;
+
+		    if (!obj.Symbol.IsDefinition) return;
+
 		    var symbol = obj.Symbol as INamedTypeSymbol;
-		    if(symbol?.TypeKind != TypeKind.Enum) return;
-			if(symbol.Name.EndsWith("s", StringComparison.OrdinalIgnoreCase))return;
+		    if (symbol?.TypeKind != TypeKind.Enum) return;
+
+		    if (symbol.Name.EndsWith("s", StringComparison.OrdinalIgnoreCase)) return;
+
+			var declSymbol = obj.Symbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(obj.CancellationToken);
+			if(!CheckSupport(declSymbol))return;
 
 		    DiagnosticDescriptor descriptor = GetDescriptorByMethodName(nameof(EnumsMustEndInS));
 
@@ -70,7 +69,9 @@ namespace CodeStyleEnforcer
 
 	    [Diagnostic]
 	    public static void FileMustEndInNewLine(SyntaxNodeAnalysisContext obj)
-		{
+	    {
+		    var nameSpaceNodes = obj.Node.ChildNodes().OfType<NamespaceDeclarationSyntax>();
+			if (!nameSpaceNodes.Any(CheckSupport)) return;
 			var members = obj.Node.ChildNodesAndTokens();
 			var lastMember = members.LastOrDefault();
 			if (lastMember==null || lastMember.Kind() != SyntaxKind.EndOfFileToken) return;
@@ -89,7 +90,10 @@ namespace CodeStyleEnforcer
 	    [Diagnostic]
 	    public static void MembersMustBePrecededByEmptyLine(SyntaxNodeAnalysisContext obj)
 	    {
-		    var affected = new List<SyntaxKind>
+
+		    if (!CheckSupport(obj.Node)) return;
+
+			var affected = new List<SyntaxKind>
 		    {
 			    SyntaxKind.InterfaceDeclaration,
 			    SyntaxKind.ClassDeclaration,
@@ -150,15 +154,31 @@ namespace CodeStyleEnforcer
 		[Diagnostic]
 		public static void ClosingBraceMustHaveComment(SyntaxNodeAnalysisContext obj)
 		{
+
+			if (!CheckSupport(obj.Node)) return;
 			var node = obj.Node;
 			var lastToken = node.GetLastToken();
 
 			if (lastToken.Kind() != SyntaxKind.CloseBraceToken) return;
+			
+			string keyword = null;
+			string name = null;
+			var dec = obj.Node as TypeDeclarationSyntax;
+			if (dec != null)
+			{
+				name = dec.Identifier.ToString();
+				keyword = dec.Keyword.ToString();
+			}
+			var dec2 = obj.Node as NamespaceDeclarationSyntax;
+			if (dec2 != null)
+			{
+				name = dec2.Name.ToString();
+				keyword = dec2.NamespaceKeyword.ToString();
+			}
 
-			var declarationEnum = lastToken.Parent.Kind();
-			var declName = Enum.GetName(typeof(SyntaxKind), declarationEnum);
-			var name = declName.Replace("Declaration", "");
-			var targetComment = "//End " + name;
+			var targetComment = "// End "+ name + " " + keyword;
+
+
 
 			if (lastToken.HasTrailingTrivia)
 			{

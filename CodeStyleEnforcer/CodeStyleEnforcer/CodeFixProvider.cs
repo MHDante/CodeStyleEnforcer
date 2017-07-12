@@ -43,7 +43,7 @@ namespace CodeStyleEnforcer
 			var token = root.FindToken(diagnostic.Location.SourceSpan.End);
 		    var comment = SyntaxFactory.Comment(diagnostic.Properties["TargetComment"]);
 		    SyntaxNode newRoot;
-		    var triviaToAdd = new[] {comment, SyntaxFactory.CarriageReturnLineFeed};
+		    var triviaToAdd = new[] {comment};
 
 			if (token.HasTrailingTrivia)
 		    {
